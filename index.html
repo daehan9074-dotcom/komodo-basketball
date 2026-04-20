@@ -553,15 +553,15 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
   await loadInit();
   const voted={};
   currentAttendance.forEach(a=>{voted[a.name]=a});
+  const noneAll=[];
+  currentMembers.forEach(m=>{
+    if(!voted[m.name]&&m.memberType==='정회원')noneAll.push(m.name);
+  });
   const sections=currentDays.map(d=>{
-    const yes=[],no=[],none=[];
+    const yes=[],no=[];
     currentMembers.forEach(m=>{
       const a=voted[m.name];
-      if(!a){
-        // 미투표는 정회원만 표시 (휴활회원 제외)
-        if(m.memberType==='정회원')none.push(m.name);
-        return;
-      }
+      if(!a)return;
       if(a.days.includes('모두 불참')){no.push(m.name);return}
       if(a.days.includes(d.title))yes.push(m.name);else no.push(m.name);
     });
@@ -570,11 +570,13 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
       '<div class="status-names">'+(yes.map(esc).join(', ')||'-')+'</div>'+
       '<div class="status-row"><span><span class="tag tag-no">불참</span>'+no.length+'명</span></div>'+
       '<div class="status-names">'+(no.map(esc).join(', ')||'-')+'</div>'+
-      '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+none.length+'명</span></div>'+
-      '<div class="status-names">'+(none.map(esc).join(', ')||'-')+'</div>'+
       '</div>';
   }).join('');
-  openModal('<h3>📊 참가 인원 현황</h3>'+sections+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
+  const noneSection='<div class="status-section"><h4>미투표</h4>'+
+    '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+noneAll.length+'명</span></div>'+
+    '<div class="status-names">'+(noneAll.map(esc).join(', ')||'-')+'</div>'+
+    '</div>';
+  openModal('<h3>📊 참가 인원 현황</h3>'+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
 });
 
 /* ===== 팀 생성기 ===== */
