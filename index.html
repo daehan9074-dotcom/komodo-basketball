@@ -576,29 +576,26 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
 });
 
 /* ===== 팀 생성기 ===== */
-let tgDay='',tgNumTeams=2,tgTeams=[],tgPool=[],tgConstraints=[];
+let tgDay='',tgNumTeams=2,tgTeams=[],tgPool=[];
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
   await loadInit();
   if(currentDays.length>0&&!currentDays.some(d=>d.title===tgDay))tgDay=currentDays[0].title;
-  tgTeams=[];tgPool=[];tgConstraints=[];
+  tgTeams=[];tgPool=[];
   renderTeamGenerator();
 });
 function renderTeamGenerator(){
   const dayBtns=currentDays.map(d=>
     '<button class="tg-btn'+(tgDay===d.title?' active':'')+'" onclick="tgSetDay(\''+esc(d.title).replace(/'/g,"\\'")+'\')">'+esc(d.title)+'</button>'
   ).join('');
-  const numBtns=[2,3,4].map(n=>
-    '<button class="tg-btn'+(tgNumTeams===n?' active':'')+'" onclick="tgSetNum('+n+')">'+n+'팀</button>'
-  ).join('');
+  const numBtns=[2,3,4].map(n=>{
+    const label=Array.from({length:n},(_,i)=>String.fromCharCode(65+i)).join('/');
+    return '<button class="tg-btn'+(tgNumTeams===n?' active':'')+'" onclick="tgSetNum('+n+')">'+label+' ('+n+'팀)</button>';
+  }).join('');
   openModal(
     '<h3>🏀 팀 생성기</h3>'+
     '<div class="tg-field"><label>진행일</label><div class="tg-btn-row">'+dayBtns+'</div></div>'+
-    '<div class="tg-field"><label>팀 수</label><div class="tg-btn-row">'+numBtns+'</div></div>'+
-    '<div class="tg-field"><label>같은 팀 / 다른 팀 지정</label><div id="tgConstraints"></div>'+
-      '<button class="tg-btn" onclick="tgAddConstraint(\'same\')" style="margin-top:6px">+ 같은 팀</button> '+
-      '<button class="tg-btn" onclick="tgAddConstraint(\'diff\')">+ 다른 팀</button>'+
-    '</div>'+
+    '<div class="tg-field"><label>팀 구성</label><div class="tg-btn-row">'+numBtns+'</div></div>'+
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
@@ -606,25 +603,9 @@ function renderTeamGenerator(){
     '</div>'+
     '<div id="tgResult"></div>'
   );
-  renderConstraints();
 }
 function tgSetDay(d){tgDay=d;renderTeamGenerator()}
 function tgSetNum(n){tgNumTeams=n;renderTeamGenerator()}
-function tgAddConstraint(type){tgConstraints.push({type,a:'',b:''});renderConstraints()}
-function renderConstraints(){
-  const box=document.getElementById('tgConstraints');if(!box)return;
-  const attendees=getAttendees(tgDay);
-  const opts='<option value="">선택</option>'+attendees.map(m=>'<option value="'+esc(m.name)+'">'+esc(m.name)+'</option>').join('');
-  box.innerHTML=tgConstraints.map((c,i)=>
-    '<div class="constraint-row">'+
-    '<span style="font-weight:700;color:'+(c.type==='same'?'#2c5f2e':'#c0392b')+'">'+(c.type==='same'?'같은 팀':'다른 팀')+'</span>'+
-    '<select onchange="tgConstraints['+i+'].a=this.value">'+opts.replace('value="'+esc(c.a)+'"','value="'+esc(c.a)+'" selected')+'</select>'+
-    '<span>↔</span>'+
-    '<select onchange="tgConstraints['+i+'].b=this.value">'+opts.replace('value="'+esc(c.b)+'"','value="'+esc(c.b)+'" selected')+'</select>'+
-    '<button onclick="tgConstraints.splice('+i+',1);renderConstraints()">✕</button>'+
-    '</div>'
-  ).join('');
-}
 function getAttendees(day){
   const voted=currentAttendance.filter(a=>a.days.includes(day)).map(a=>a.name);
   return currentMembers.filter(m=>voted.includes(m.name));
@@ -639,38 +620,13 @@ function tgRandom(){
   const attendees=getAttendees(tgDay);
   if(attendees.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
   tgTeams=Array.from({length:tgNumTeams},()=>[]);
-  const assigned=new Set();
-  const groups=[];
-  tgConstraints.filter(c=>c.type==='same'&&c.a&&c.b).forEach(c=>{
-    let g=groups.find(gr=>gr.includes(c.a)||gr.includes(c.b));
-    if(!g){g=[];groups.push(g)}
-    if(!g.includes(c.a))g.push(c.a);
-    if(!g.includes(c.b))g.push(c.b);
-  });
-  const diffPairs=tgConstraints.filter(c=>c.type==='diff'&&c.a&&c.b).map(c=>[c.a,c.b]);
-  groups.sort((a,b)=>b.length-a.length);
-  groups.forEach(g=>{
-    const ti=tgTeams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
-    g.forEach(n=>{
-      const m=attendees.find(x=>x.name===n);
-      if(m&&!assigned.has(n)){tgTeams[ti].push(m);assigned.add(n)}
-    });
-  });
-  const remain=attendees.filter(m=>!assigned.has(m.name));
   const byPos={가드:[],포워드:[],센터:[],기타:[]};
-  remain.forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
+  attendees.forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
   Object.keys(byPos).forEach(p=>byPos[p].sort(()=>Math.random()-.5));
-  const violates=(name,ti)=>diffPairs.some(([a,b])=>{
-    if(a===name)return tgTeams[ti].some(m=>m.name===b);
-    if(b===name)return tgTeams[ti].some(m=>m.name===a);
-    return false;
-  });
   ['가드','포워드','센터','기타'].forEach(pos=>{
     byPos[pos].forEach(m=>{
-      const order=tgTeams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n);
-      let placed=false;
-      for(const o of order){if(!violates(m.name,o.i)){tgTeams[o.i].push(m);placed=true;break}}
-      if(!placed)tgTeams[order[0].i].push(m);
+      const ti=tgTeams.map((t,i)=>({i,n:t.length})).sort((a,b)=>a.n-b.n)[0].i;
+      tgTeams[ti].push(m);
     });
   });
   tgPool=[];
