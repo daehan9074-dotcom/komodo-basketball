@@ -58,7 +58,7 @@
   .member-info .mi-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700}
   .mi-badge.paid{background:#e8f4e8;color:#2c5f2e;border:1px solid #2c5f2e}
   .mi-badge.unpaid{background:#fdecea;color:#c0392b;border:1px solid #c0392b}
-  .inactive-notice{margin-top:8px;color:#c0392b;font-size:.88rem;font-weight:600;text-align:center}
+  .inactive-notice{margin-top:8px;color:#1a1a1a;font-size:.88rem;font-weight:600;text-align:center}
   .prev-vote{display:none;margin-top:8px;background:#fff4e6;border:1.5px solid #ffb74d;border-radius:8px;padding:10px 12px;font-size:.82rem;color:#c27800}
   .prev-vote.show{display:block}
 
@@ -370,8 +370,8 @@ async function checkName(){
 }
 function showMemberInfo(m){
   const info=document.getElementById('memberInfo');
-  const fee=m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'<span class="mi-badge unpaid">회비 미납</span>';
-  const inactive=m.isInactive?'<div class="inactive-notice">현재 휴활 회원입니다.</div>':'';
+  const fee=m.isInactive?'':(m.paid?'<span class="mi-badge paid">회비 납부 완료</span>':'');
+  const inactive=m.isInactive?'<div class="inactive-notice">현재 휴활 회원입니다. 참석 가능한 날을 선택해주세요.</div>':'';
   info.innerHTML=
     '<div class="mi-row">'+
     '<span><b>이름</b>'+esc(m.name)+'</span>'+
@@ -379,7 +379,7 @@ function showMemberInfo(m){
     '<span><b>등번호</b>'+esc(m.number||'-')+'</span>'+
     '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
     '</div>'+
-    '<div style="margin-top:6px">'+fee+'</div>'+
+    (fee?'<div style="margin-top:6px">'+fee+'</div>':'')+
     inactive;
   info.classList.add('show');
   if(m.isInactive){toast('현재 휴활 회원입니다','error')}
