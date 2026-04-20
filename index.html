@@ -56,9 +56,9 @@
   .member-info .mi-row span{display:inline-flex;gap:4px}
   .member-info .mi-row b{color:var(--green);font-weight:700}
   .member-info .mi-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700}
-  .mi-badge.title{background:#a87d00;color:#fff}
   .mi-badge.paid{background:#e8f4e8;color:#2c5f2e;border:1px solid #2c5f2e}
   .mi-badge.unpaid{background:#fdecea;color:#c0392b;border:1px solid #c0392b}
+  .inactive-notice{margin-top:8px;background:#fdecea;border:1.5px solid #c0392b;color:#c0392b;padding:10px 12px;border-radius:8px;font-size:.88rem;font-weight:600;text-align:center}
   .prev-vote{display:none;margin-top:8px;background:#fff4e6;border:1.5px solid #ffb74d;border-radius:8px;padding:10px 12px;font-size:.82rem;color:#c27800}
   .prev-vote.show{display:block}
 
@@ -370,18 +370,19 @@ async function checkName(){
 }
 function showMemberInfo(m){
   const info=document.getElementById('memberInfo');
-  let badges='';
-  if(m.title)badges+='<span class="mi-badge title">'+esc(m.title)+'</span> ';
-  badges+=m.paid?'<span class="mi-badge paid">회비 납부</span>':'<span class="mi-badge unpaid">회비 미납</span>';
+  const fee=m.paid?'<span class="mi-badge paid">회비 납부</span>':'<span class="mi-badge unpaid">회비 미납</span>';
+  const inactive=m.isInactive?'<div class="inactive-notice">⚠️ 현재 휴활 회원입니다.</div>':'';
   info.innerHTML=
     '<div class="mi-row">'+
-    '<span><b>등번</b>'+esc(m.number||'-')+'</span>'+
-    '<span><b>생년월일</b>'+esc(m.birth||'-')+'</span>'+
-    '<span><b>키</b>'+esc(m.height||'-')+'</span>'+
+    '<span><b>이름</b>'+esc(m.name)+'</span>'+
+    '<span><b>나이</b>'+esc((m.age===''||m.age==null)?'-':m.age)+'</span>'+
     '<span><b>포지션</b>'+esc(m.position||'-')+'</span>'+
+    '<span><b>등번호</b>'+esc(m.number||'-')+'</span>'+
     '</div>'+
-    '<div style="margin-top:6px">'+badges+'</div>';
+    '<div style="margin-top:6px">'+fee+'</div>'+
+    inactive;
   info.classList.add('show');
+  if(m.isInactive){toast('현재 휴활 회원입니다','error')}
 }
 function fillDays(days){
   currentDays.forEach(d=>{
