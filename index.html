@@ -658,11 +658,12 @@ function renderTeamResult(){
   box.innerHTML='<div class="team-grid">'+teamsHtml+'</div>'+poolHtml+copyHtml;
 }
 function tgCopyText(){
+  const dropSurname=(n)=>{const s=String(n||'').trim();return s.length<=1?s:s.slice(1)};
   const lines=[tgDay+' 팀 배정'];
   tgTeams.forEach((t,i)=>{
     if(t.length===0)return;
     const letter=String.fromCharCode(65+i);
-    lines.push(letter+'팀 : '+t.map(m=>m.name).join(' '));
+    lines.push(letter+'팀 : '+t.map(m=>dropSurname(m.name)).join(' '));
   });
   return lines.join('\n');
 }
