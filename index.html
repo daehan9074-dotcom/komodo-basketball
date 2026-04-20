@@ -555,7 +555,11 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
     const yes=[],no=[],none=[];
     currentMembers.forEach(m=>{
       const a=voted[m.name];
-      if(!a){none.push(m.name);return}
+      if(!a){
+        // 미투표는 정회원만 표시 (휴활회원 제외)
+        if(m.memberType==='정회원')none.push(m.name);
+        return;
+      }
       if(a.days.includes('모두 불참')){no.push(m.name);return}
       if(a.days.includes(d.title))yes.push(m.name);else no.push(m.name);
     });
