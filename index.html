@@ -123,6 +123,7 @@
   .status-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #eee}
   .status-section:last-child{border:none}
   .status-section h4{font-size:.95rem;color:var(--green);margin-bottom:10px;font-weight:700}
+  .status-section.none h4{color:#444}
   .status-row{display:flex;justify-content:space-between;padding:6px 0;font-size:.86rem;border-bottom:1px dashed #eee}
   .status-row:last-child{border:none}
   .status-row .tag{display:inline-block;padding:2px 8px;border-radius:100px;font-size:.72rem;font-weight:700;margin-right:6px}
@@ -572,7 +573,7 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
       '<div class="status-names">'+(no.map(esc).join(', ')||'-')+'</div>'+
       '</div>';
   }).join('');
-  const noneSection='<div class="status-section"><h4>미투표</h4>'+
+  const noneSection='<div class="status-section none"><h4>미투표</h4>'+
     '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+noneAll.length+'명</span></div>'+
     '<div class="status-names">'+(noneAll.map(esc).join(', ')||'-')+'</div>'+
     '</div>';
