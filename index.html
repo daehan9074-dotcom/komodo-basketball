@@ -37,6 +37,11 @@
   .notice-box .notice-content{font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-break:break-word}
   .notice-box .notice-empty{color:#9a8f76;font-size:.85rem}
 
+  .comment-box{background:#eef5fa;border:1.5px solid #9dc8e8;border-radius:12px;padding:14px 16px;margin-bottom:22px}
+  .comment-box .comment-label{font-size:.7rem;font-weight:700;color:#2d6ea5;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+  .comment-box .comment-item{font-size:.88rem;line-height:1.55;padding:3px 0;word-break:break-word}
+  .comment-box .comment-item b{color:#2d6ea5;font-weight:700;margin-right:4px}
+
   .field{margin-bottom:22px}
   .field label.main-label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--label);margin-bottom:8px}
   .field label.main-label .required{color:var(--green);margin-left:3px}
@@ -149,8 +154,12 @@
   .pool-player .pos{color:var(--green);font-weight:700;font-size:.7rem}
   .pool-player .pp-name{margin-right:2px}
   .pool-team-btns{display:inline-flex;gap:3px;margin-left:2px}
-  .pool-team-btn{background:var(--green);color:#fff;border:none;border-radius:100px;width:22px;height:22px;font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:.15s}
+  .pool-team-btn{background:var(--green);color:#fff;border:none;border-radius:100px;min-width:22px;height:22px;padding:0 6px;font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
   .pool-team-btn:hover{background:#1e4d20}
+  .pool-team-btn.pool-del{background:#c0392b}
+  .pool-team-btn.pool-del:hover{background:#a63222}
+  .tg-add-guest{margin-top:10px;background:var(--white);border:1.5px dashed var(--green);color:var(--green);padding:8px 14px;border-radius:10px;font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;transition:.18s}
+  .tg-add-guest:hover{background:var(--green-light)}
   .constraint-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:.82rem;flex-wrap:wrap}
   .constraint-row select{flex:1;min-width:100px;padding:6px;border-radius:6px;border:1px solid var(--border);font-size:.82rem}
   .constraint-row button{background:#c0392b;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem}
@@ -189,6 +198,11 @@
       <div class="notice-content" id="noticeContent"><span class="notice-empty">공지사항이 없습니다.</span></div>
     </div>
 
+    <div class="comment-box" id="commentBox" style="display:none">
+      <div class="comment-label">💬 한마디</div>
+      <div id="commentList"></div>
+    </div>
+
     <form id="surveyForm" novalidate>
 
       <div class="field" id="field-name">
@@ -206,6 +220,11 @@
         <label class="main-label">참석 가능일 <span class="required">*</span></label>
         <div id="daysContainer"></div>
         <div class="error-msg">참석 가능일을 선택해 주세요.</div>
+      </div>
+
+      <div class="field" id="field-comment">
+        <label class="main-label" for="commentInput">한마디 남기기 <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0">(선택)</span></label>
+        <textarea id="commentInput" rows="2" maxlength="200" placeholder="하고 싶은 말을 자유롭게 남겨주세요"></textarea>
       </div>
 
       <button type="submit" class="btn-submit" id="submitBtn">
@@ -280,6 +299,7 @@ async function loadInit(){
       currentAttendance=r.attendance||[];
       currentMembers=r.members||[];
       renderNotice();
+      renderComments();
       renderDays();
     }
   }catch(e){console.warn('init 실패',e)}
@@ -288,6 +308,19 @@ function renderNotice(){
   const el=document.getElementById('noticeContent');
   if(noticeText.trim()){el.textContent=noticeText}
   else{el.innerHTML='<span class="notice-empty">공지사항이 없습니다.</span>'}
+}
+function getCommentHtml(){
+  const items=currentAttendance.filter(a=>a.comment&&String(a.comment).trim());
+  if(items.length===0)return '';
+  return items.map(a=>'<div class="comment-item"><b>'+esc(a.name)+' :</b>'+esc(a.comment)+'</div>').join('');
+}
+function renderComments(){
+  const box=document.getElementById('commentBox');
+  const list=document.getElementById('commentList');
+  const html=getCommentHtml();
+  if(!html){box.style.display='none';return}
+  list.innerHTML=html;
+  box.style.display='';
 }
 function renderDays(){
   const c=document.getElementById('daysContainer');
@@ -367,6 +400,8 @@ async function checkName(){
         '⚠️ 이전에 투표한 기록이 있습니다: <b>'+(r.prevAttendance.days||[]).map(esc).join(', ')+'</b><br>제출 시 이전 내용이 수정됩니다.';
       document.getElementById('prevVote').classList.add('show');
       fillDays(r.prevAttendance.days||[]);
+      const ci=document.getElementById('commentInput');
+      if(ci)ci.value=r.prevAttendance.comment||'';
     }
     toast('본인 확인 완료','success');
   }catch(e){toast('서버 통신 실패','error');console.error(e)}
@@ -412,6 +447,9 @@ document.getElementById('surveyForm').addEventListener('submit',async(e)=>{
   if(noneCb&&noneCb.checked)days.push('모두 불참');
   if(days.length===0){setErr('field-days','참석 가능일을 선택해 주세요.');return}
 
+  const commentEl=document.getElementById('commentInput');
+  const comment=commentEl?commentEl.value.trim():'';
+
   if(prevAttendance){
     const ok=await confirmModal('이전 제출 기록이 있습니다. 내용을 수정하시겠습니까?');
     if(!ok)return;
@@ -421,7 +459,7 @@ document.getElementById('surveyForm').addEventListener('submit',async(e)=>{
   btn.classList.add('loading');btn.disabled=true;
   btn.querySelector('.btn-text').textContent='처리 중...';
   try{
-    const r=await fetchJsonp(SCRIPT_URL,{action:'submit',name:currentMember.name,days:days});
+    const r=await fetchJsonp(SCRIPT_URL,{action:'submit',name:currentMember.name,days:days,comment:comment});
     if(r.ok){
       document.getElementById('formWrapper').style.display='none';
       document.getElementById('successScreen').classList.add('show');
@@ -445,6 +483,7 @@ function confirmModal(msg){
 
 document.getElementById('resetBtn').addEventListener('click',()=>{
   document.getElementById('surveyForm').reset();
+  const ci=document.getElementById('commentInput');if(ci)ci.value='';
   document.getElementById('memberInfo').classList.remove('show');
   document.getElementById('prevVote').classList.remove('show');
   document.getElementById('formWrapper').style.display='';
@@ -552,6 +591,8 @@ async function admResetPage(){
 /* ===== 참가 현황 ===== */
 document.getElementById('statusBtn').addEventListener('click',async()=>{
   await loadInit();
+  const commentHtml=getCommentHtml();
+  const commentSection=commentHtml?'<div class="comment-box" style="margin-bottom:14px"><div class="comment-label">💬 한마디</div>'+commentHtml+'</div>':'';
   const voted={};
   currentAttendance.forEach(a=>{voted[a.name]=a});
   const noneAll=[];
@@ -577,11 +618,11 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
     '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+noneAll.length+'명</span></div>'+
     '<div class="status-names">'+(noneAll.map(esc).join(', ')||'-')+'</div>'+
     '</div>';
-  openModal('<h3>📊 참가 인원 현황</h3>'+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
+  openModal('<h3>📊 참가 인원 현황</h3>'+commentSection+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
 });
 
 /* ===== 팀 생성기 ===== */
-let tgDay='',tgNumTeams=2,tgTeams=[],tgPool=[];
+let tgDay='',tgMode='num',tgNumTeams=2,tgTeams=[],tgPool=[];
 
 document.getElementById('teamBtn').addEventListener('click',async()=>{
   await loadInit();
@@ -589,18 +630,29 @@ document.getElementById('teamBtn').addEventListener('click',async()=>{
   tgTeams=[];tgPool=[];
   renderTeamGenerator();
 });
+function tgTeamCount(){return tgMode==='ybob'?2:tgNumTeams}
+function tgTeamLabel(i){
+  if(tgMode==='ybob')return ['YB','OB'][i]||'';
+  return String.fromCharCode(65+i);
+}
 function renderTeamGenerator(){
   const dayBtns=currentDays.map(d=>
     '<button class="tg-btn'+(tgDay===d.title?' active':'')+'" onclick="tgSetDay(\''+esc(d.title).replace(/'/g,"\\'")+'\')">'+esc(d.title)+'</button>'
   ).join('');
-  const numBtns=[2,3,4].map(n=>{
-    const label=Array.from({length:n},(_,i)=>String.fromCharCode(65+i)).join('/');
-    return '<button class="tg-btn'+(tgNumTeams===n?' active':'')+'" onclick="tgSetNum('+n+')">'+label+' ('+n+'팀)</button>';
+  const compOptions=[
+    {mode:'num',n:2,label:'A/B (2팀)'},
+    {mode:'num',n:3,label:'A/B/C (3팀)'},
+    {mode:'num',n:4,label:'A/B/C/D (4팀)'},
+    {mode:'ybob',n:2,label:'YB vs OB'}
+  ];
+  const compBtns=compOptions.map(c=>{
+    const active=(tgMode===c.mode)&&(c.mode==='ybob'||tgNumTeams===c.n);
+    return '<button class="tg-btn'+(active?' active':'')+'" onclick="tgSetComposition(\''+c.mode+'\','+c.n+')">'+c.label+'</button>';
   }).join('');
   openModal(
     '<h3>🏀 팀 생성기</h3>'+
     '<div class="tg-field"><label>진행일</label><div class="tg-btn-row">'+dayBtns+'</div></div>'+
-    '<div class="tg-field"><label>팀 구성</label><div class="tg-btn-row">'+numBtns+'</div></div>'+
+    '<div class="tg-field"><label>팀 구성</label><div class="tg-btn-row">'+compBtns+'</div></div>'+
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
@@ -608,22 +660,40 @@ function renderTeamGenerator(){
     '</div>'+
     '<div id="tgResult"></div>'
   );
+  if(tgTeams.length>0||tgPool.length>0)renderTeamResult();
 }
 function tgSetDay(d){tgDay=d;renderTeamGenerator()}
-function tgSetNum(n){tgNumTeams=n;renderTeamGenerator()}
+function tgSetComposition(mode,n){
+  tgMode=mode;
+  if(mode==='ybob')tgNumTeams=2;else tgNumTeams=n;
+  tgTeams=[];tgPool=[];
+  renderTeamGenerator();
+}
 function getAttendees(day){
   const voted=currentAttendance.filter(a=>a.days.includes(day)).map(a=>a.name);
   return currentMembers.filter(m=>voted.includes(m.name));
 }
 function tgBuild(){
   const attendees=getAttendees(tgDay);
-  tgPool=[...attendees];
-  tgTeams=Array.from({length:tgNumTeams},()=>[]);
+  if(tgMode==='ybob'){
+    tgTeams=[[],[]];
+    const unknown=[];
+    attendees.forEach(m=>{
+      const age=parseInt(m.age,10);
+      if(isNaN(age)){unknown.push(m);return}
+      if(age>=40)tgTeams[1].push(m);else tgTeams[0].push(m);
+    });
+    tgPool=unknown;
+  }else{
+    tgPool=[...attendees];
+    tgTeams=Array.from({length:tgNumTeams},()=>[]);
+  }
   renderTeamResult();
 }
 function tgRandom(){
   const attendees=getAttendees(tgDay);
   if(attendees.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
+  if(tgMode==='ybob'){tgBuild();return}
   tgTeams=Array.from({length:tgNumTeams},()=>[]);
   const byPos={가드:[],포워드:[],센터:[],기타:[]};
   attendees.forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
@@ -637,20 +707,29 @@ function tgRandom(){
   tgPool=[];
   renderTeamResult();
 }
+function tgMemberDisplay(m){
+  return m.isGuest?'게스트('+esc(m.name)+')':esc(m.name);
+}
 function renderTeamResult(){
   const box=document.getElementById('tgResult');if(!box)return;
   const posTag=(p)=>'<span class="pos">'+({가드:'G',포워드:'F',센터:'C'}[p]||'-')+'</span>';
+  const count=tgTeamCount();
   const teamsHtml=tgTeams.map((t,i)=>
-    '<div class="team-box"><h5>'+String.fromCharCode(65+i)+'팀 ('+t.length+'명)</h5>'+
-    t.map((m,j)=>'<div class="team-member"><span>'+posTag(m.position)+' '+esc(m.name)+'</span><button onclick="tgRemove('+i+','+j+')">✕</button></div>').join('')+
+    '<div class="team-box"><h5>'+tgTeamLabel(i)+'팀 ('+t.length+'명)</h5>'+
+    t.map((m,j)=>'<div class="team-member"><span>'+posTag(m.position)+' '+tgMemberDisplay(m)+'</span><button onclick="tgRemove('+i+','+j+')">✕</button></div>').join('')+
     '</div>'
   ).join('');
   const teamBtns=(pi)=>'<span class="pool-team-btns">'+
-    Array.from({length:tgNumTeams},(_,ti)=>'<button class="pool-team-btn" onclick="tgAssign('+pi+','+ti+')">'+String.fromCharCode(65+ti)+'</button>').join('')+
+    Array.from({length:count},(_,ti)=>'<button class="pool-team-btn" onclick="tgAssign('+pi+','+ti+')">'+tgTeamLabel(ti)+'</button>').join('')+
     '</span>';
   const poolHtml='<div class="pool-box"><h5>대기 (팀 버튼 클릭)</h5>'+
-    tgPool.map((m,i)=>'<span class="pool-player">'+posTag(m.position)+'<span class="pp-name">'+esc(m.name)+'</span>'+teamBtns(i)+'</span>').join('')+
-    (tgPool.length===0?'<span style="color:#aaa;font-size:.8rem">모두 배정됨</span>':'')+'</div>';
+    tgPool.map((m,i)=>{
+      const delBtn=m.isGuest?'<button class="pool-team-btn pool-del" onclick="tgDeleteGuest('+i+')">X</button>':'';
+      return '<span class="pool-player">'+posTag(m.position)+'<span class="pp-name">'+tgMemberDisplay(m)+'</span>'+teamBtns(i)+delBtn+'</span>';
+    }).join('')+
+    (tgPool.length===0?'<span style="color:#aaa;font-size:.8rem">모두 배정됨</span>':'')+
+    '<div><button class="tg-add-guest" onclick="tgAddGuestDialog()">+ 게스트 추가</button></div>'+
+    '</div>';
   const hasTeams=tgTeams.some(t=>t.length>0);
   const copyHtml=hasTeams?
     '<div class="copy-box"><pre id="tgCopyText">'+esc(tgCopyText())+'</pre>'+
@@ -658,12 +737,15 @@ function renderTeamResult(){
   box.innerHTML='<div class="team-grid">'+teamsHtml+'</div>'+poolHtml+copyHtml;
 }
 function tgCopyText(){
-  const dropSurname=(n)=>{const s=String(n||'').trim();return s.length<=1?s:s.slice(1)};
+  const nameFor=(m)=>{
+    if(m.isGuest)return '게스트('+String(m.name||'').trim()+')';
+    const s=String(m.name||'').trim();
+    return s.length<=1?s:s.slice(1);
+  };
   const lines=[tgDay+' 팀 배정'];
   tgTeams.forEach((t,i)=>{
     if(t.length===0)return;
-    const letter=String.fromCharCode(65+i);
-    lines.push(letter+'팀 : '+t.map(m=>dropSurname(m.name)).join(' '));
+    lines.push(tgTeamLabel(i)+'팀 : '+t.map(m=>nameFor(m)).join(' '));
   });
   return lines.join('\n');
 }
@@ -683,12 +765,45 @@ function tgDoCopy(){
 }
 function tgRemove(ti,mi){
   const m=tgTeams[ti].splice(mi,1)[0];
-  tgPool.push(m);renderTeamResult();
+  if(m)tgPool.push(m);
+  renderTeamResult();
 }
 function tgAssign(pi,ti){
+  const count=tgTeamCount();
   const m=tgPool.splice(pi,1)[0];
-  if(!m||ti<0||ti>=tgNumTeams){if(m)tgPool.push(m);renderTeamResult();return}
+  if(!m||ti<0||ti>=count){if(m)tgPool.push(m);renderTeamResult();return}
   tgTeams[ti].push(m);renderTeamResult();
+}
+function tgDeleteGuest(pi){
+  const m=tgPool[pi];
+  if(!m||!m.isGuest)return;
+  tgPool.splice(pi,1);
+  renderTeamResult();
+}
+function tgAddGuestDialog(){
+  openModal(
+    '<h3>게스트 추가</h3>'+
+    '<div class="field"><label class="main-label">이름</label>'+
+    '<input type="text" id="guestName" placeholder="게스트 이름" autocomplete="off" /></div>'+
+    '<div class="field"><label class="main-label">포지션</label>'+
+    '<select id="guestPos"><option value="가드">가드</option><option value="포워드">포워드</option><option value="센터">센터</option></select></div>'+
+    '<div class="modal-actions">'+
+      '<button class="btn-secondary" onclick="renderTeamGenerator()">취소</button>'+
+      '<button class="btn-primary" onclick="tgConfirmGuest()">추가</button>'+
+    '</div>'
+  );
+  setTimeout(()=>{
+    const el=document.getElementById('guestName');
+    if(el){el.focus();el.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();tgConfirmGuest()}})}
+  },80);
+}
+function tgConfirmGuest(){
+  const name=(document.getElementById('guestName')||{}).value;
+  const pos=(document.getElementById('guestPos')||{}).value;
+  const n=String(name||'').trim();
+  if(!n){toast('이름을 입력하세요','error');return}
+  tgPool.push({name:n,position:pos||'가드',isGuest:true,age:null});
+  renderTeamGenerator();
 }
 
 /* 시작 */
