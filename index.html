@@ -593,6 +593,10 @@ async function admResetPage(){
 /* ===== 참가 현황 ===== */
 document.getElementById('statusBtn').addEventListener('click',async()=>{
   await loadInit();
+  const noticeBody=noticeText.trim()
+    ?'<div class="notice-content">'+esc(noticeText)+'</div>'
+    :'<div class="notice-content"><span class="notice-empty">공지사항이 없습니다.</span></div>';
+  const noticeSection='<div class="notice-box" style="margin-bottom:14px"><div class="notice-label">📢 공지사항</div>'+noticeBody+'</div>';
   const commentHtml=getCommentHtml();
   const commentBody=commentHtml||'<span class="comment-empty">아직 남긴 한마디가 없습니다.</span>';
   const commentSection='<div class="comment-box" style="margin-bottom:14px"><div class="comment-label">💬 한마디</div>'+commentBody+'</div>';
@@ -621,7 +625,7 @@ document.getElementById('statusBtn').addEventListener('click',async()=>{
     '<div class="status-row"><span><span class="tag tag-none">미투표</span>'+noneAll.length+'명</span></div>'+
     '<div class="status-names">'+(noneAll.map(esc).join(', ')||'-')+'</div>'+
     '</div>';
-  openModal('<h3>📊 참가 인원 현황</h3>'+commentSection+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
+  openModal('<h3>📊 참가 인원 현황</h3>'+noticeSection+commentSection+sections+noneSection+'<div class="modal-actions"><button class="btn-secondary" onclick="closeModal()">닫기</button></div>');
 });
 
 /* ===== 팀 생성기 ===== */
@@ -676,8 +680,15 @@ function getAttendees(day){
   const voted=currentAttendance.filter(a=>a.days.includes(day)).map(a=>a.name);
   return currentMembers.filter(m=>voted.includes(m.name));
 }
+function collectGuests(){
+  const guests=[];
+  tgTeams.forEach(t=>t.forEach(m=>{if(m&&m.isGuest)guests.push(m)}));
+  tgPool.forEach(m=>{if(m&&m.isGuest)guests.push(m)});
+  return guests;
+}
 function tgBuild(){
   const attendees=getAttendees(tgDay);
+  const guests=collectGuests();
   if(tgMode==='ybob'){
     tgTeams=[[],[]];
     const unknown=[];
@@ -686,20 +697,21 @@ function tgBuild(){
       if(isNaN(age)){unknown.push(m);return}
       if(age>=40)tgTeams[1].push(m);else tgTeams[0].push(m);
     });
-    tgPool=unknown;
+    tgPool=unknown.concat(guests);
   }else{
-    tgPool=[...attendees];
+    tgPool=attendees.concat(guests);
     tgTeams=Array.from({length:tgNumTeams},()=>[]);
   }
   renderTeamResult();
 }
 function tgRandom(){
   const attendees=getAttendees(tgDay);
-  if(attendees.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
+  const guests=collectGuests();
+  if(attendees.length===0&&guests.length===0){toast(tgDay+' 참석자가 없습니다','error');return}
   if(tgMode==='ybob'){tgBuild();return}
   tgTeams=Array.from({length:tgNumTeams},()=>[]);
   const byPos={가드:[],포워드:[],센터:[],기타:[]};
-  attendees.forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
+  attendees.concat(guests).forEach(m=>{(byPos[m.position]||byPos.기타).push(m)});
   Object.keys(byPos).forEach(p=>byPos[p].sort(()=>Math.random()-.5));
   ['가드','포워드','센터','기타'].forEach(pos=>{
     byPos[pos].forEach(m=>{
