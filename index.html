@@ -644,13 +644,6 @@ function tgTeamLabel(i){
   return String.fromCharCode(65+i);
 }
 function renderTeamGenerator(){
-  const attendees=getAttendees(tgDay);
-  const guests=collectGuests();
-  const allPlayers=attendees.concat(guests);
-  const posOrder={가드:0,포워드:1,센터:2};
-  const posLabel={가드:'G',포워드:'F',센터:'C'};
-  const sortedPlayers=[...allPlayers].sort((a,b)=>(posOrder[a.position]??3)-(posOrder[b.position]??3));
-
   const dayBtns=currentDays.map(d=>
     '<button class="tg-btn'+(tgDay===d.title?' active':'')+'" onclick="tgSetDay(\''+esc(d.title).replace(/'/g,"\\'")+'\')">'+esc(d.title)+'</button>'
   ).join('');
@@ -664,59 +657,17 @@ function renderTeamGenerator(){
     const active=(tgMode===c.mode)&&(c.mode==='ybob'||tgNumTeams===c.n);
     return '<button class="tg-btn'+(active?' active':'')+'" onclick="tgSetComposition(\''+c.mode+'\','+c.n+')">'+c.label+'</button>';
   }).join('');
-
-  const makeSelect=(value,handler)=>{
-    const opts=sortedPlayers.map(m=>{
-      const pos=posLabel[m.position]||'-';
-      const label=pos+' '+m.name+(m.isGuest?' (게스트)':'');
-      return '<option value="'+esc(m.name)+'"'+(m.name===value?' selected':'')+'>'+esc(label)+'</option>';
-    }).join('');
-    return '<select onchange="'+handler+'"><option value="">-- 선택 --</option>'+opts+'</select>';
-  };
-
-  const sameRows=tgSameConstraints.map((members,rowIdx)=>{
-    const selects=members.map((name,mIdx)=>makeSelect(name,'tgUpdateSame('+rowIdx+','+mIdx+',this.value)')).join('');
-    return '<div class="constraint-row">'+selects+
-      '<button onclick="tgAddSameMember('+rowIdx+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>'+
-      '<button onclick="tgRemoveSame('+rowIdx+')">✕</button></div>';
-  }).join('');
-
-  const diffRows=tgDiffConstraints.map((members,rowIdx)=>{
-    const selects=members.map((name,mIdx)=>makeSelect(name,'tgUpdateDiff('+rowIdx+','+mIdx+',this.value)')).join('');
-    const addBtn=members.length<tgNumTeams?'<button onclick="tgAddDiffMember('+rowIdx+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>':'';
-    return '<div class="constraint-row">'+selects+addBtn+'<button onclick="tgRemoveDiff('+rowIdx+')">✕</button></div>';
-  }).join('');
-
   openModal(
     '<h3>🏀 팀 생성기</h3>'+
-    '<div class="tg-field">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
-        '<label style="font-size:.78rem;font-weight:700;color:var(--label);text-transform:uppercase;letter-spacing:.05em;margin:0">진행일</label>'+
-        '<button onclick="closeModal()" style="padding:4px 12px;border:1.5px solid #ccc;background:#f8f8f8;border-radius:7px;font-family:inherit;font-size:.78rem;cursor:pointer;color:#555;font-weight:600">닫기</button>'+
-      '</div>'+
-      '<div class="tg-btn-row">'+dayBtns+'</div>'+
-    '</div>'+
+    '<div class="tg-field"><label>진행일</label><div class="tg-btn-row">'+dayBtns+'</div></div>'+
     '<div class="tg-field"><label>팀 구성</label><div class="tg-btn-row">'+compBtns+'</div></div>'+
     '<div class="modal-actions">'+
       '<button class="btn-primary" onclick="tgBuild()">수동 배정</button>'+
       '<button class="btn-primary" onclick="tgRandom()">🎲 랜덤 배정</button>'+
     '</div>'+
-    '<div style="margin-top:14px;border-top:1px solid #eee;padding-top:12px">'+
-      '<div style="font-size:.78rem;font-weight:700;color:var(--label);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">분배 조건</div>'+
-      '<div style="margin-bottom:12px">'+
-        '<div style="font-size:.8rem;font-weight:700;color:#2c5f2e;margin-bottom:6px">같은 팀</div>'+
-        (sameRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
-        '<button class="tg-add-guest" onclick="tgAddSame()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
-      '</div>'+
-      '<div>'+
-        '<div style="font-size:.8rem;font-weight:700;color:#c0392b;margin-bottom:6px">다른 팀</div>'+
-        (diffRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
-        '<button class="tg-add-guest" onclick="tgAddDiff()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
-      '</div>'+
-    '</div>'+
     '<div id="tgResult"></div>'
   );
-  if(tgTeams.length>0||tgPool.length>0)renderTeamResult();
+  renderTeamResult();
 }
 function tgSetDay(d){tgDay=d;renderTeamGenerator()}
 function tgSetComposition(mode,n){
@@ -872,7 +823,52 @@ function renderTeamResult(){
   const copyHtml=hasTeams?
     '<div class="copy-box"><pre id="tgCopyText">'+esc(tgCopyText())+'</pre>'+
     '<button class="btn-copy" onclick="tgDoCopy()">📋 복사하기</button></div>':'';
-  box.innerHTML='<div class="team-grid">'+teamsHtml+'</div>'+poolHtml+copyHtml;
+
+  // 분배 조건 (팀 배정과 대기 사이)
+  const rtAll=[...getAttendees(tgDay),...collectGuests()];
+  const rtPosOrd={가드:0,포워드:1,센터:2};
+  const rtPosLbl={가드:'G',포워드:'F',센터:'C'};
+  rtAll.sort((a,b)=>(rtPosOrd[a.position]??3)-(rtPosOrd[b.position]??3));
+  const mkSel=(value,handler)=>{
+    const opts=rtAll.map(m=>{
+      const pos=rtPosLbl[m.position]||'-';
+      const lbl=pos+' '+m.name+(m.isGuest?' (게스트)':'');
+      return '<option value="'+esc(m.name)+'"'+(m.name===value?' selected':'')+'>'+esc(lbl)+'</option>';
+    }).join('');
+    return '<select onchange="'+handler+'"><option value="">-- 선택 --</option>'+opts+'</select>';
+  };
+  const sameRows=tgSameConstraints.map((members,ri)=>{
+    const sels=members.map((name,mi)=>mkSel(name,'tgUpdateSame('+ri+','+mi+',this.value)')).join('');
+    return '<div class="constraint-row">'+sels+
+      '<button onclick="tgAddSameMember('+ri+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>'+
+      '<button onclick="tgRemoveSame('+ri+')">✕</button></div>';
+  }).join('');
+  const diffRows=tgDiffConstraints.map((members,ri)=>{
+    const sels=members.map((name,mi)=>mkSel(name,'tgUpdateDiff('+ri+','+mi+',this.value)')).join('');
+    const addBtn=members.length<tgNumTeams?'<button onclick="tgAddDiffMember('+ri+')" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0">+</button>':'';
+    return '<div class="constraint-row">'+sels+addBtn+'<button onclick="tgRemoveDiff('+ri+')">✕</button></div>';
+  }).join('');
+  const constraintHtml=
+    '<div style="margin:14px 0;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:12px 0">'+
+      '<div style="font-size:.78rem;font-weight:700;color:var(--label);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">분배 조건</div>'+
+      '<div style="margin-bottom:12px">'+
+        '<div style="font-size:.8rem;font-weight:700;color:#2c5f2e;margin-bottom:6px">같은 팀</div>'+
+        (sameRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
+        '<button class="tg-add-guest" onclick="tgAddSame()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:.8rem;font-weight:700;color:#c0392b;margin-bottom:6px">다른 팀</div>'+
+        (diffRows||'<div style="font-size:.8rem;color:#aaa;margin-bottom:4px">조건 없음</div>')+
+        '<button class="tg-add-guest" onclick="tgAddDiff()" style="padding:5px 12px;font-size:.8rem;margin-top:4px">+ 추가</button>'+
+      '</div>'+
+    '</div>';
+
+  const closeBtn='<div style="text-align:center;margin-top:16px;padding-bottom:4px">'+
+    '<button onclick="closeModal()" style="padding:8px 36px;border:1.5px solid #ccc;background:#f8f8f8;border-radius:9px;font-family:inherit;font-size:.88rem;cursor:pointer;color:#555;font-weight:600">닫기</button>'+
+    '</div>';
+
+  const hasResult=tgTeams.length>0||tgPool.length>0;
+  box.innerHTML=(hasResult?'<div class="team-grid">'+teamsHtml+'</div>':'')+constraintHtml+(hasResult?poolHtml:'')+copyHtml+closeBtn;
 }
 function tgCopyText(){
   const nameFor=(m)=>{
